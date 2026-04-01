@@ -111,6 +111,13 @@ describe("PDVPage", () => {
   });
 
   it("finaliza venda com item + pagamento completo", async () => {
+    let capturedBody: unknown = null;
+    server.use(
+      http.post(`${BASE}/vendas`, async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({ id: 999 }, { status: 201 });
+      })
+    );
     renderPage();
     // Adicionar produto
     const input = screen.getByPlaceholderText(/código de barras/i);
@@ -126,5 +133,37 @@ describe("PDVPage", () => {
     await waitFor(() => expect(btnFinalizar).not.toBeDisabled());
     fireEvent.click(btnFinalizar);
     await waitFor(() => expect(screen.getByText(/venda finalizada/i)).toBeInTheDocument());
+    // Verificar estrutura do body enviado
+    expect(capturedBody).not.toBeNull();
+    const body = capturedBody as { pagamentos: Array<{ codigoFormaPagamento: number; valor: number }> };
+    expect(body.pagamentos).toBeDefined();
+    expect(body.pagamentos[0].codigoFormaPagamento).toBeDefined();
+    expect(body.pagamentos[0].valor).toBeGreaterThan(0);
+  });
+
+  it("body de venda omite campos TEF quando pagamento é direto", async () => {
+    let capturedBody: unknown = null;
+    server.use(
+      http.post(`${BASE}/vendas`, async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({ id: 998 }, { status: 201 });
+      })
+    );
+    renderPage();
+    const input = screen.getByPlaceholderText(/código de barras/i);
+    fireEvent.change(input, { target: { value: "789001" } });
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+    await waitFor(() => expect(screen.getByText("Produto Teste")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Dinheiro")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Dinheiro"));
+    const btnFinalizar = screen.getByRole("button", { name: "Finalizar Venda" });
+    await waitFor(() => expect(btnFinalizar).not.toBeDisabled());
+    fireEvent.click(btnFinalizar);
+    await waitFor(() => screen.getByText(/venda finalizada/i));
+    const body = capturedBody as { pagamentos: Array<Record<string, unknown>> };
+    // Pagamento direto NÃO deve ter campos TEF no body
+    expect(body.pagamentos[0].nsu).toBeUndefined();
+    expect(body.pagamentos[0].codigoAutorizacao).toBeUndefined();
+    expect(body.pagamentos[0].bandeira).toBeUndefined();
   });
 });

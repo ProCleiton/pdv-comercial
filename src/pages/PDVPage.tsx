@@ -118,15 +118,28 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
   const restante = totalCarrinho - totalPago;
   const troco = totalPago > totalCarrinho ? totalPago - totalCarrinho : 0;
 
-  function adicionarPagamentoDireto(forma: FormaPagamento, valor: number) {
+  function adicionarPagamentoDireto(
+    forma: FormaPagamento,
+    valor: number,
+    tefData?: { nsu?: string; codigoAutorizacao?: string; bandeira?: string; tipoTransacao?: string }
+  ) {
     setPagamentos((prev) => {
       const idx = prev.findIndex((p) => p.codigoFormaPagamento === forma.id);
-      if (idx >= 0) {
+      if (idx >= 0 && !tefData) {
+        // Pagamento direto: soma ao existente
         const att = [...prev];
         att[idx] = { ...att[idx], valor: att[idx].valor + valor };
         return att;
       }
-      return [...prev, { codigoFormaPagamento: forma.id, nomeFormaPagamento: forma.descricao, valor, nsu: undefined, codigoAutorizacao: undefined, bandeira: undefined }];
+      return [...prev, {
+        codigoFormaPagamento: forma.id,
+        nomeFormaPagamento: forma.descricao,
+        valor,
+        nsu: tefData?.nsu,
+        codigoAutorizacao: tefData?.codigoAutorizacao,
+        bandeira: tefData?.bandeira,
+        tipoTransacao: tefData?.tipoTransacao,
+      }];
     });
   }
 
@@ -155,8 +168,13 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
 
   async function handleTEFFechar() {
     if (tef.status === "aprovado" && tef.transacao && fpTEFAtual) {
-      // Confirma automaticamente e adiciona ao carrinho de pagamentos
-      adicionarPagamentoDireto(fpTEFAtual, tef.transacao.valorCentavos / 100);
+      // Adiciona ao carrinho com dados TEF completos (NSU, autorização, bandeira)
+      adicionarPagamentoDireto(fpTEFAtual, tef.transacao.valorCentavos / 100, {
+        nsu: tef.transacao.nsu,
+        codigoAutorizacao: tef.transacao.codigoAutorizacao,
+        bandeira: tef.transacao.bandeira as string | undefined,
+        tipoTransacao: tef.transacao.tipo,
+      });
     }
     setShowTEF(false);
     tef.reset();
@@ -208,6 +226,10 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
         pagamentos: pagamentos.map((p) => ({
           codigoFormaPagamento: p.codigoFormaPagamento,
           valor: p.valor,
+          ...(p.nsu               && { nsu: p.nsu }),
+          ...(p.codigoAutorizacao && { codigoAutorizacao: p.codigoAutorizacao }),
+          ...(p.bandeira          && { bandeira: p.bandeira }),
+          ...(p.tipoTransacao     && { tipoTransacao: p.tipoTransacao }),
         })),
       };
       const resultado = await api.post<{ id: number }>("/vendas", body);

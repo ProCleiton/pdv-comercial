@@ -72,6 +72,7 @@ export interface PagamentoCarrinho {
   nsu?: string;
   codigoAutorizacao?: string;
   bandeira?: string;
+  tipoTransacao?: string;
 }
 
 export type TelaAtiva =
