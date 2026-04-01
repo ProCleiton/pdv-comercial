@@ -9,6 +9,9 @@ import type { TurnoCaixa, Produto, ItemCarrinho, FormaPagamento, PagamentoCarrin
 import type { UsuarioPDV } from "@/lib/auth";
 import type { LicencaPDV } from "@/types/pdv";
 import { useImpressora } from "@/hooks/useImpressora";
+import { useTEF } from "@/hooks/useTEF";
+import type { TipoTransacaoTEF } from "@/services/tef";
+import TEFModal from "@/components/TEFModal";
 
 interface Props {
   turno: TurnoCaixa;
@@ -17,6 +20,16 @@ interface Props {
   onSangria: () => void;
   onFechamento: () => void;
   onConfig: () => void;
+}
+
+/** Mapeia descrição da forma de pagamento para tipo TEF. */
+function inferirTipoTEF(descricao: string): TipoTransacaoTEF {
+  const d = descricao.toLowerCase();
+  if (d.includes("débit") || d.includes("debito")) return "debito";
+  if (d.includes("pix")) return "pix";
+  if (d.includes("voucher") || d.includes("benefício") || d.includes("beneficio") || d.includes("vale")) return "voucher";
+  if (d.includes("parc")) return "credito_parcelado_loja";
+  return "credito_vista";
 }
 
 export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamento, onConfig }: Props) {
@@ -28,7 +41,14 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
   const [sucesso, setSucesso] = useState(false);
   const buscaRef = useRef<HTMLInputElement>(null);
 
+  // Estado do modal TEF
+  const [showTEF, setShowTEF] = useState(false);
+  const [tipoTEFAtual, setTipoTEFAtual] = useState<TipoTransacaoTEF>("credito_vista");
+  const [fpTEFAtual, setFpTEFAtual] = useState<FormaPagamento | null>(null);
+  const tefPendenteFinalizar = useRef(false);
+
   const { imprimirRecibo, abrirGavetaManual, imprimindo, erroImpressora } = useImpressora(usuario);
+  const tef = useTEF(usuario);
 
   const { data: formasPagamento = [] } = useQuery<FormaPagamento[]>({
     queryKey: ["formas-pagamento"],
@@ -98,19 +118,74 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
   const restante = totalCarrinho - totalPago;
   const troco = totalPago > totalCarrinho ? totalPago - totalCarrinho : 0;
 
-  function adicionarPagamento(forma: FormaPagamento) {
-    if (restante <= 0) return;
-    const valorPagamento = restante;
+  function adicionarPagamentoDireto(forma: FormaPagamento, valor: number) {
     setPagamentos((prev) => {
       const idx = prev.findIndex((p) => p.codigoFormaPagamento === forma.id);
       if (idx >= 0) {
         const att = [...prev];
-        att[idx] = { ...att[idx], valor: att[idx].valor + valorPagamento };
+        att[idx] = { ...att[idx], valor: att[idx].valor + valor };
         return att;
       }
-      return [...prev, { codigoFormaPagamento: forma.id, nomeFormaPagamento: forma.descricao, valor: valorPagamento }];
+      return [...prev, { codigoFormaPagamento: forma.id, nomeFormaPagamento: forma.descricao, valor, nsu: undefined, codigoAutorizacao: undefined, bandeira: undefined }];
     });
   }
+
+  async function handleCliqueFormaPagamento(forma: FormaPagamento) {
+    if (restante <= 0) return;
+
+    if (tef.ehPagamentoTEF(forma.id)) {
+      // Fluxo TEF — abre modal e inicia transação no PINPAD
+      const tipo = inferirTipoTEF(forma.descricao);
+      setTipoTEFAtual(tipo);
+      setFpTEFAtual(forma);
+      setShowTEF(true);
+      tefPendenteFinalizar.current = false;
+      try {
+        await tef.iniciarPagamento(restante, tipo);
+        // Após iniciar, o usuário vai passar o cartão — aguardamos confirmar() quando fechar modal
+        tefPendenteFinalizar.current = true;
+      } catch {
+        setShowTEF(false);
+      }
+    } else {
+      // Fluxo direto (dinheiro, etc.)
+      adicionarPagamentoDireto(forma, restante);
+    }
+  }
+
+  async function handleTEFFechar() {
+    if (tef.status === "aprovado" && tef.transacao && fpTEFAtual) {
+      // Confirma automaticamente e adiciona ao carrinho de pagamentos
+      adicionarPagamentoDireto(fpTEFAtual, tef.transacao.valorCentavos / 100);
+    }
+    setShowTEF(false);
+    tef.reset();
+    setFpTEFAtual(null);
+  }
+
+  async function handleTEFCancelar() {
+    await tef.cancelar();
+  }
+
+  // Quando o modal TEF fecha, o hook já processou — precisamos confirmar na fase de pagamento
+  // A confirmação real (gravar NSU na venda) ocorre em finalizarVenda()
+  async function handleConfirmarTEF() {
+    try {
+      await tef.confirmar();
+    } catch {
+      // erro já tratado no hook
+    }
+  }
+
+  // Escuta mudanças de status do TEF enquanto o modal está aberto
+  useEffect(() => {
+    if (showTEF && tef.status === "aguardando_cartao" && tefPendenteFinalizar.current) {
+      // Dispara a confirmação automaticamente (simula o operador aguardando o cartão)
+      handleConfirmarTEF();
+      tefPendenteFinalizar.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTEF, tef.status]);
 
   function limparPagamentos() { setPagamentos([]); }
 
@@ -317,10 +392,15 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
               {formasPagamento.map((fp) => (
                 <button
                   key={fp.id}
-                  onClick={() => adicionarPagamento(fp)}
+                  onClick={() => handleCliqueFormaPagamento(fp)}
                   disabled={restante <= 0}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] disabled:opacity-40 py-3 px-2 text-sm text-center text-[var(--foreground)] transition-colors"
+                  className={cn(
+                    "rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] disabled:opacity-40 py-3 px-2 text-sm text-center text-[var(--foreground)] transition-colors",
+                    tef.ehPagamentoTEF(fp.id) && "ring-1 ring-[var(--primary)]"
+                  )}
+                  title={tef.ehPagamentoTEF(fp.id) ? "Pagamento via PINPAD (TEF)" : undefined}
                 >
+                  {tef.ehPagamentoTEF(fp.id) && <span className="text-xs block text-[var(--primary)] mb-1">💳</span>}
                   {fp.descricao}
                 </button>
               ))}
@@ -362,6 +442,17 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
           </div>
         </div>
       </div>
+
+      {/* Modal TEF */}
+      {showTEF && (
+        <TEFModal
+          transacao={tef.transacao}
+          status={tef.status}
+          tipo={tipoTEFAtual}
+          onCancelar={handleTEFCancelar}
+          onFechar={handleTEFFechar}
+        />
+      )}
     </div>
   );
 }

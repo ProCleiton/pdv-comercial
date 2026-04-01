@@ -8,6 +8,15 @@ import {
   type ConfigImpressora,
 } from "@/hooks/useImpressora";
 import { salvarConfigBalanca, type ConfigBalanca } from "@/hooks/useBalanca";
+import {
+  salvarConfigTEF,
+  carregarConfigTEF,
+  CONFIG_TEF_PADRAO,
+  type ConfigTEF,
+} from "@/services/tef";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/services/api";
+import type { FormaPagamento } from "@/types/pdv";
 
 interface Props {
   onVoltar: () => void;
@@ -37,11 +46,18 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
 
   const [cfgImpressora, setCfgImpressora] = useState<ConfigImpressora>(loadConfigImpressora);
   const [cfgBalanca, setCfgBalanca] = useState<ConfigBalanca>(loadConfigBalanca);
+  const [cfgTEF, setCfgTEF] = useState<ConfigTEF>(() => carregarConfigTEF() ?? CONFIG_TEF_PADRAO);
 
   const [testandoImpressora, setTestando] = useState(false);
   const [feedbackImpressora, setFeedbackImpressora] = useState("");
   const [feedbackBalanca, setFeedbackBalanca] = useState("");
   const [salvo, setSalvo] = useState(false);
+
+  const { data: formasPagamento = [] } = useQuery<FormaPagamento[]>({
+    queryKey: ["formas-pagamento"],
+    queryFn: () => api.get<FormaPagamento[]>("/formas-pagamentos"),
+    staleTime: 300_000,
+  });
 
   async function atualizarPortas() {
     setCarregandoPortas(true);
@@ -55,6 +71,7 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
   function salvarTudo() {
     salvarConfigImpressora(cfgImpressora);
     salvarConfigBalanca(cfgBalanca);
+    salvarConfigTEF(cfgTEF);
     setSalvo(true);
     setTimeout(() => setSalvo(false), 2500);
   }
@@ -261,6 +278,106 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
               {feedbackBalanca}
             </p>
           )}
+        </div>
+
+        {/* TEF / PINPAD */}
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">💳 PINPAD / TEF</h2>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Pagamentos eletrônicos via terminal de cartão. Use <strong>Mock</strong> para desenvolvimento sem hardware.
+          </p>
+
+          <div className="space-y-1">
+            <label className="text-xs text-[var(--muted-foreground)]">Provider</label>
+            <div className="flex gap-4">
+              {(["mock", "sitef"] as const).map((p) => (
+                <label key={p} className="flex items-center gap-2 text-sm text-[var(--foreground)] cursor-pointer">
+                  <input
+                    type="radio"
+                    name="tef-provider"
+                    value={p}
+                    checked={cfgTEF.provider === p}
+                    onChange={() => setCfgTEF((c) => ({ ...c, provider: p }))}
+                  />
+                  {p === "mock" ? "Mock (desenvolvimento)" : "SiTef (produção)"}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {cfgTEF.provider === "sitef" && (
+            <div className="space-y-3 pl-4 border-l-2 border-[var(--border)]">
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--muted-foreground)]">Endpoint intSiTef</label>
+                <Input
+                  value={cfgTEF.endpointSitef}
+                  onChange={(e) => setCfgTEF((c) => ({ ...c, endpointSitef: e.target.value }))}
+                  placeholder="http://localhost:4096"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-[var(--muted-foreground)]">Cód. Estabelecimento SiTef</label>
+                  <Input
+                    value={cfgTEF.codigoEstabelecimentoSitef}
+                    onChange={(e) => setCfgTEF((c) => ({ ...c, codigoEstabelecimentoSitef: e.target.value }))}
+                    placeholder="00000000"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-[var(--muted-foreground)]">Cód. Terminal SiTef</label>
+                  <Input
+                    value={cfgTEF.codigoTerminalSitef}
+                    onChange={(e) => setCfgTEF((c) => ({ ...c, codigoTerminalSitef: e.target.value }))}
+                    placeholder="001"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--muted-foreground)]">Timeout (segundos)</label>
+                <Input
+                  type="number"
+                  min={10}
+                  max={300}
+                  value={cfgTEF.timeoutSegundos}
+                  onChange={(e) => setCfgTEF((c) => ({ ...c, timeoutSegundos: Number(e.target.value) }))}
+                  className="w-24"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-xs text-[var(--muted-foreground)] block">
+              Formas de pagamento que acionam o PINPAD
+            </label>
+            {formasPagamento.length === 0 ? (
+              <p className="text-xs text-[var(--muted-foreground)]">Carregando formas de pagamento...</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {formasPagamento.map((fp) => (
+                  <label key={fp.id} className="flex items-center gap-2 text-sm text-[var(--foreground)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cfgTEF.codigosFormasPagamentoTEF.includes(fp.id)}
+                      onChange={(e) => {
+                        setCfgTEF((c) => ({
+                          ...c,
+                          codigosFormasPagamentoTEF: e.target.checked
+                            ? [...c.codigosFormasPagamentoTEF, fp.id]
+                            : c.codigosFormasPagamentoTEF.filter((id) => id !== fp.id),
+                        }));
+                      }}
+                    />
+                    {fp.descricao}
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Marcadas = abre modal PINPAD ao selecionar. Desmarcadas = pagamento direto (dinheiro, etc.).
+            </p>
+          </div>
         </div>
 
         {/* Salvar */}
