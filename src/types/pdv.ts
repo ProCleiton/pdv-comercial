@@ -68,6 +68,10 @@ export interface PagamentoCarrinho {
   codigoFormaPagamento: number;
   nomeFormaPagamento: string;
   valor: number;
+  /** Dados TEF — preenchidos quando o pagamento foi via PINPAD */
+  nsu?: string;
+  codigoAutorizacao?: string;
+  bandeira?: string;
 }
 
 export type TelaAtiva =
