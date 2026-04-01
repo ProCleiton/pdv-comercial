@@ -72,7 +72,7 @@ export default function LicencaPage({ onLicencaValida, onErroPermanente }: Props
     setProcessando(true);
     try {
       const result = await api.post<{ token: string; usuario: UsuarioPDV }>("/auth/login", {
-        login: login.trim(),
+        usuario: login.trim(),
         senha,
       });
       localStorage.setItem("token", result.token);
