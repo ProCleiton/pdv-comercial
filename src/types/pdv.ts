@@ -76,4 +76,5 @@ export type TelaAtiva =
   | "tela_pdv"
   | "sangria"
   | "fechamento"
+  | "config_pdv"
   | "erro_licenca";

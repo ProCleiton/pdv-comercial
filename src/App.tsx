@@ -6,6 +6,7 @@ import AberturaTurnoPage from "@/pages/AberturaTurnoPage";
 import PDVPage from "@/pages/PDVPage";
 import SangriaPage from "@/pages/SangriaPage";
 import FechamentoPage from "@/pages/FechamentoPage";
+import ConfigPDVPage from "@/pages/ConfigPDVPage";
 import { isAutenticado, logout, type UsuarioPDV } from "@/lib/auth";
 import { type TelaAtiva, type TurnoCaixa, type LicencaPDV } from "@/types/pdv";
 import "./App.css";
@@ -99,6 +100,7 @@ function AppContent() {
   const handleIrSangria = useCallback(() => setTela("sangria"), []);
   const handleVoltarPDV = useCallback(() => setTela("tela_pdv"), []);
   const handleIrFechamento = useCallback(() => setTela("fechamento"), []);
+  const handleIrConfig = useCallback(() => setTela("config_pdv"), []);
 
   const handleTurnoFechado = useCallback(() => {
     setTurnoAtivo(null);
@@ -150,6 +152,10 @@ function AppContent() {
     );
   }
 
+  if (tela === "config_pdv") {
+    return <ConfigPDVPage onVoltar={handleVoltarPDV} />;
+  }
+
   if (tela === "fechamento") {
     return (
       <FechamentoPage
@@ -168,6 +174,7 @@ function AppContent() {
       licenca={licenca!}
       onSangria={handleIrSangria}
       onFechamento={handleIrFechamento}
+      onConfig={handleIrConfig}
     />
   );
 }

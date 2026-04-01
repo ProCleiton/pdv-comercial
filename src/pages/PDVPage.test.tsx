@@ -37,6 +37,7 @@ function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const onSangria = vi.fn();
   const onFechamento = vi.fn();
+  const onConfig = vi.fn();
   render(
     <QueryClientProvider client={qc}>
       <PDVPage
@@ -45,10 +46,11 @@ function renderPage() {
         licenca={licencaMock}
         onSangria={onSangria}
         onFechamento={onFechamento}
+        onConfig={onConfig}
       />
     </QueryClientProvider>
   );
-  return { onSangria, onFechamento };
+  return { onSangria, onFechamento, onConfig };
 }
 
 describe("PDVPage", () => {

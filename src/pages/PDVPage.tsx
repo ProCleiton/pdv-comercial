@@ -4,10 +4,11 @@ import { api } from "@/services/api";
 import { logInfo, logError } from "@/services/logger";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { cn, formataMoeda } from "@/lib/utils";
+import { cn, formataMoeda, formataNumeroPedido } from "@/lib/utils";
 import type { TurnoCaixa, Produto, ItemCarrinho, FormaPagamento, PagamentoCarrinho } from "@/types/pdv";
 import type { UsuarioPDV } from "@/lib/auth";
 import type { LicencaPDV } from "@/types/pdv";
+import { useImpressora } from "@/hooks/useImpressora";
 
 interface Props {
   turno: TurnoCaixa;
@@ -15,9 +16,10 @@ interface Props {
   licenca: LicencaPDV;
   onSangria: () => void;
   onFechamento: () => void;
+  onConfig: () => void;
 }
 
-export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamento }: Props) {
+export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamento, onConfig }: Props) {
   const [busca, setBusca] = useState("");
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([]);
   const [pagamentos, setPagamentos] = useState<PagamentoCarrinho[]>([]);
@@ -26,29 +28,27 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
   const [sucesso, setSucesso] = useState(false);
   const buscaRef = useRef<HTMLInputElement>(null);
 
+  const { imprimirRecibo, abrirGavetaManual, imprimindo, erroImpressora } = useImpressora(usuario);
+
   const { data: formasPagamento = [] } = useQuery<FormaPagamento[]>({
     queryKey: ["formas-pagamento"],
     queryFn: () => api.get<FormaPagamento[]>("/formas-pagamentos"),
     staleTime: 300_000,
   });
 
-  // Focar no campo de busca automaticamente
   useEffect(() => {
     buscaRef.current?.focus();
   }, [sucesso]);
 
-  // Busca por código de barras (enter) ou pelo termo
   const buscarProduto = useCallback(async () => {
     const termo = busca.trim();
     if (!termo) return;
     setErroBusca("");
     try {
       let produto: Produto | null = null;
-      // Tentar busca por código de barras primeiro (mais rápido na leitora)
       try {
         produto = await api.get<Produto>(`/produtos/barras/${encodeURIComponent(termo)}`);
       } catch {
-        // fallback: busca textual — pega o primeiro resultado
         const lista = await api.get<Produto[]>(`/produtos?busca=${encodeURIComponent(termo)}`);
         if (lista && lista.length > 0) produto = lista[0];
       }
@@ -135,8 +135,29 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
           valor: p.valor,
         })),
       };
-      await api.post<{ id: number }>("/vendas", body);
-      await logInfo("PDV", usuario.login, "venda_finalizada", `itens=${carrinho.length} total=${totalCarrinho}`);
+      const resultado = await api.post<{ id: number }>("/vendas", body);
+      await logInfo("PDV", usuario.login, "venda_finalizada", `id=${resultado.id} itens=${carrinho.length} total=${totalCarrinho}`);
+
+      // Imprimir recibo automaticamente (silencioso se impressora não configurada)
+      await imprimirRecibo({
+        numeroCupom: formataNumeroPedido(resultado.id),
+        nomeEstabelecimento: licenca.nomeTerminal,
+        operador: usuario.nome,
+        itens: carrinho.map((item) => ({
+          descricao: item.produto.descricao,
+          quantidade: item.quantidade,
+          precoUnitario: item.precoUnitario,
+          desconto: item.desconto,
+          total: (item.precoUnitario - item.desconto) * item.quantidade,
+        })),
+        pagamentos: pagamentos.map((p) => ({
+          descricao: p.nomeFormaPagamento,
+          valor: p.valor,
+        })),
+        totalBruto: totalCarrinho,
+        troco,
+      });
+
       setCarrinho([]);
       setPagamentos([]);
       setSucesso(true);
@@ -161,10 +182,28 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-[var(--muted-foreground)] hidden md:inline">{usuario.nome}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => abrirGavetaManual()}
+            title="Abrir gaveta manualmente"
+          >
+            🗂
+          </Button>
+          <Button variant="outline" size="sm" onClick={onConfig} title="Configurações de hardware">
+            ⚙️
+          </Button>
           <Button variant="outline" size="sm" onClick={onSangria}>Sangria</Button>
           <Button variant="destructive" size="sm" onClick={onFechamento}>Fechar Caixa</Button>
         </div>
       </header>
+
+      {/* Mensagem de erro da impressora (não bloqueia fluxo) */}
+      {erroImpressora && (
+        <div className="px-4 py-1 text-xs text-[var(--destructive)] bg-[var(--destructive)]/10 border-b border-[var(--destructive)]/20">
+          ⚠️ Impressora: {erroImpressora}
+        </div>
+      )}
 
       {/* Conteúdo principal */}
       <div className="flex flex-1 overflow-hidden">
@@ -307,9 +346,9 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
               onClick={finalizarVenda}
               className="w-full"
               size="xl"
-              disabled={finalizando || carrinho.length === 0 || restante > 0}
+              disabled={finalizando || imprimindo || carrinho.length === 0 || restante > 0}
             >
-              {finalizando ? "Finalizando…" : "Finalizar Venda"}
+              {finalizando ? "Finalizando…" : imprimindo ? "Imprimindo…" : "Finalizar Venda"}
             </Button>
             <Button
               variant="outline"
