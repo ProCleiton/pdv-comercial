@@ -15,7 +15,7 @@ import {
   type ConfigTEF,
 } from "@/services/tef";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/services/api";
+import { api, getApiBaseUrl, setApiBaseUrl } from "@/services/api";
 import type { FormaPagamento } from "@/types/pdv";
 
 interface Props {
@@ -48,6 +48,10 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
   const [cfgBalanca, setCfgBalanca] = useState<ConfigBalanca>(loadConfigBalanca);
   const [cfgTEF, setCfgTEF] = useState<ConfigTEF>(() => carregarConfigTEF() ?? CONFIG_TEF_PADRAO);
 
+  const [urlServidor, setUrlServidor] = useState(() => getApiBaseUrl());
+  const [testandoServidor, setTestandoServidor] = useState(false);
+  const [feedbackServidor, setFeedbackServidor] = useState("");
+
   const [testandoImpressora, setTestando] = useState(false);
   const [feedbackImpressora, setFeedbackImpressora] = useState("");
   const [feedbackBalanca, setFeedbackBalanca] = useState("");
@@ -69,6 +73,7 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
   useEffect(() => { atualizarPortas(); }, []);
 
   function salvarTudo() {
+    setApiBaseUrl(urlServidor);
     salvarConfigImpressora(cfgImpressora);
     salvarConfigBalanca(cfgBalanca);
     salvarConfigTEF(cfgTEF);
@@ -127,6 +132,54 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
       </header>
 
       <div className="flex-1 p-6 space-y-8 max-w-2xl mx-auto w-full">
+
+        {/* Servidor */}
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">🌐 Servidor</h2>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            URL da API ComercialIA. Altere apenas ao conectar em um servidor remoto (produção).
+          </p>
+
+          <div className="space-y-1">
+            <label className="text-xs text-[var(--muted-foreground)]">URL do servidor</label>
+            <Input
+              value={urlServidor}
+              onChange={(e) => { setUrlServidor(e.target.value); setFeedbackServidor(""); }}
+              placeholder="http://192.168.1.10:9000"
+            />
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Padrão local: <code>http://localhost:9000</code>
+            </p>
+          </div>
+
+          {feedbackServidor && (
+            <p className={`text-xs ${feedbackServidor.startsWith("✓") ? "text-[var(--success,#22c55e)]" : "text-[var(--destructive)]"}`}>
+              {feedbackServidor}
+            </p>
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={testandoServidor}
+            onClick={async () => {
+              const urlNorm = urlServidor.replace(/\/$/, "").trim();
+              if (!urlNorm) { setFeedbackServidor("Informe a URL do servidor."); return; }
+              setTestandoServidor(true);
+              setFeedbackServidor("");
+              try {
+                const res = await fetch(`${urlNorm}/actuator/health`, { signal: AbortSignal.timeout(5000) });
+                setFeedbackServidor(res.ok ? "✓ Servidor acessível e saudável." : `Servidor respondeu com status ${res.status}.`);
+              } catch {
+                setFeedbackServidor("Não foi possível conectar. Verifique a URL e a rede.");
+              } finally {
+                setTestandoServidor(false);
+              }
+            }}
+          >
+            {testandoServidor ? "Testando…" : "Testar Conexão"}
+          </Button>
+        </div>
 
         {/* Portas disponíveis */}
         <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 space-y-3">

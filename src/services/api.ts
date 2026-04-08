@@ -1,4 +1,22 @@
-const API_BASE = "http://localhost:9000";
+const API_URL_KEY = "app:apiUrl";
+const API_BASE_DEFAULT = "http://api.comercialia.local";
+
+export function getApiBaseUrl(): string {
+  return localStorage.getItem(API_URL_KEY) ?? API_BASE_DEFAULT;
+}
+
+export function setApiBaseUrl(url: string): void {
+  const normalizada = url.replace(/\/$/, "").trim();
+  if (normalizada) {
+    localStorage.setItem(API_URL_KEY, normalizada);
+  } else {
+    localStorage.removeItem(API_URL_KEY);
+  }
+}
+
+function getApiBase(): string {
+  return getApiBaseUrl();
+}
 
 function getToken(): string | null {
   return localStorage.getItem("token");
@@ -22,7 +40,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${getApiBase()}${path}`, { ...options, headers });
   const usuario = getUsuarioLogin();
 
   if (res.status === 401) {
