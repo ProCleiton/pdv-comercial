@@ -77,6 +77,21 @@ export interface PagamentoCarrinho {
   tipoTransacao?: string;
 }
 
+export interface ConfigNFCe {
+  habilitada: boolean;
+  /** "1" = produção, "2" = homologação */
+  ambiente: "1" | "2";
+}
+
+export interface ResultadoNFCe {
+  notaId: number;
+  chave: string;
+  protocolo: string;
+  status: string;
+  qrcode: string;
+  urlChave: string;
+}
+
 export type TelaAtiva =
   | "validando_licenca"
   | "aguardando_turno"
