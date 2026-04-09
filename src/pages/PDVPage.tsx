@@ -11,6 +11,8 @@ import type { LicencaPDV } from "@/types/pdv";
 import { useImpressora } from "@/hooks/useImpressora";
 import { useTEF } from "@/hooks/useTEF";
 import type { TipoTransacaoTEF } from "@/services/tef";
+import { carregarConfigNFCe, emitirNFCeParaVenda } from "@/services/nfce";
+import type { ResultadoNFCe } from "@/types/pdv";
 import TEFModal from "@/components/TEFModal";
 import ModalTroco from "@/pages/ModalTroco";
 import ModalValorParcial from "@/pages/ModalValorParcial";
@@ -355,6 +357,25 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
       const resultado = await api.post<{ id: number }>("/vendas", body);
       await logInfo("PDV", usuario.login, "venda_finalizada", `id=${resultado.id} itens=${carrinho.length} total=${totalCarrinho}`);
 
+      // Emissão NFCe — não bloqueia a venda em caso de falha
+      let nfceResultado: ResultadoNFCe | undefined;
+      const cfgNFCe = carregarConfigNFCe();
+      if (cfgNFCe.habilitada) {
+        try {
+          nfceResultado = await emitirNFCeParaVenda(
+            turno.codigoEstabelecimento,
+            resultado.id,
+            totalCarrinho,
+            cfgNFCe.ambiente
+          );
+          await logInfo("PDV", usuario.login, "nfce_emitida", `venda=${resultado.id} chave=${nfceResultado.chave}`);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          await logError("PDV", usuario.login, "erro_nfce", `venda=${resultado.id} ${msg}`);
+          // NFCe falhou — venda já foi salva; apenas registra o erro
+        }
+      }
+
       await imprimirRecibo({
         numeroCupom: formataNumeroPedido(resultado.id),
         nomeEstabelecimento: licenca.nomeTerminal,
@@ -372,6 +393,14 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
         })),
         totalBruto: totalCarrinho,
         troco,
+        ...(nfceResultado && {
+          nfce: {
+            chave: nfceResultado.chave,
+            protocolo: nfceResultado.protocolo,
+            qrcode: nfceResultado.qrcode,
+            urlChave: nfceResultado.urlChave,
+          },
+        }),
       });
 
       setCarrinho([]);

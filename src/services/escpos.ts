@@ -169,6 +169,13 @@ export interface DadosRecibo {
   totalBruto: number;
   troco: number;
   cols?: 32 | 48;
+  /** Dados da NFCe emitida — quando presentes, imprime rodapé fiscal */
+  nfce?: {
+    chave: string;
+    protocolo: string;
+    qrcode?: string;
+    urlChave?: string;
+  };
 }
 
 /** Formata valor monetário em BRL sem usar Intl (CP850 não tem símbolo correto). */
@@ -221,6 +228,38 @@ export function gerarRecibo(dados: DadosRecibo): number[] {
 
   p.separator();
   p.center().line('Obrigado pela preferencia!');
+
+  // Rodapé NFCe — imprime somente quando a nota foi emitida com sucesso
+  if (dados.nfce?.chave) {
+    p.emptyLine();
+    p.separator('=');
+    p.center().bold(true).line('NFC-e').bold(false);
+    p.left();
+
+    // Chave de acesso formatada em grupos de 4 dígitos
+    const chave = dados.nfce.chave.replace(/\D/g, '');
+    const chaveFmt = chave.match(/.{1,4}/g)?.join(' ') ?? chave;
+    const linhaMax = p.cols;
+    for (let i = 0; i < chaveFmt.length; i += linhaMax) {
+      p.center().line(chaveFmt.slice(i, i + linhaMax).trim());
+    }
+
+    if (dados.nfce.protocolo) {
+      p.left().twoCol('Protocolo:', dados.nfce.protocolo);
+    }
+
+    // URL de consulta
+    if (dados.nfce.urlChave) {
+      p.emptyLine();
+      p.center().line('Consulte em:');
+      const url = dados.nfce.urlChave;
+      for (let i = 0; i < url.length; i += linhaMax) {
+        p.center().line(url.slice(i, i + linhaMax));
+      }
+    }
+    p.separator('=');
+  }
+
   p.emptyLine(3);
   p.cut();
 

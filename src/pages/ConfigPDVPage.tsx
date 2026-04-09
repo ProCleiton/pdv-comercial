@@ -14,6 +14,12 @@ import {
   CONFIG_TEF_PADRAO,
   type ConfigTEF,
 } from "@/services/tef";
+import {
+  carregarConfigNFCe,
+  salvarConfigNFCe,
+  CONFIG_NFCE_PADRAO,
+} from "@/services/nfce";
+import type { ConfigNFCe } from "@/types/pdv";
 import { useQuery } from "@tanstack/react-query";
 import { api, getApiBaseUrl, setApiBaseUrl } from "@/services/api";
 import type { FormaPagamento } from "@/types/pdv";
@@ -47,6 +53,7 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
   const [cfgImpressora, setCfgImpressora] = useState<ConfigImpressora>(loadConfigImpressora);
   const [cfgBalanca, setCfgBalanca] = useState<ConfigBalanca>(loadConfigBalanca);
   const [cfgTEF, setCfgTEF] = useState<ConfigTEF>(() => carregarConfigTEF() ?? CONFIG_TEF_PADRAO);
+  const [cfgNFCe, setCfgNFCe] = useState<ConfigNFCe>(() => carregarConfigNFCe() ?? CONFIG_NFCE_PADRAO);
 
   const [urlServidor, setUrlServidor] = useState(() => getApiBaseUrl());
   const [testandoServidor, setTestandoServidor] = useState(false);
@@ -77,6 +84,7 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
     salvarConfigImpressora(cfgImpressora);
     salvarConfigBalanca(cfgBalanca);
     salvarConfigTEF(cfgTEF);
+    salvarConfigNFCe(cfgNFCe);
     setSalvo(true);
     setTimeout(() => setSalvo(false), 2500);
   }
@@ -431,6 +439,46 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
               Marcadas = abre modal PINPAD ao selecionar. Desmarcadas = pagamento direto (dinheiro, etc.).
             </p>
           </div>
+        </div>
+
+        {/* NFCe */}
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 space-y-4">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">🧾 NFC-e (Nota Fiscal Consumidor Eletrônica)</h2>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Quando habilitada, emite NFC-e automaticamente ao finalizar cada venda. Requer o módulo fiscal configurado no servidor.
+          </p>
+
+          <label className="flex items-center gap-2 text-sm text-[var(--foreground)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={cfgNFCe.habilitada}
+              onChange={(e) => setCfgNFCe((c) => ({ ...c, habilitada: e.target.checked }))}
+            />
+            Emitir NFC-e ao finalizar venda
+          </label>
+
+          {cfgNFCe.habilitada && (
+            <div className="pl-4 border-l-2 border-[var(--border)] space-y-2">
+              <label className="text-xs text-[var(--muted-foreground)] block">Ambiente</label>
+              <div className="flex gap-6">
+                {([["2", "Homologação (testes)"], ["1", "Produção"]] as const).map(([val, label]) => (
+                  <label key={val} className="flex items-center gap-2 text-sm text-[var(--foreground)] cursor-pointer">
+                    <input
+                      type="radio"
+                      name="nfce-ambiente"
+                      value={val}
+                      checked={cfgNFCe.ambiente === val}
+                      onChange={() => setCfgNFCe((c) => ({ ...c, ambiente: val }))}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                ⚠️ Use <strong>Homologação</strong> para testes. Mude para <strong>Produção</strong> somente após certificação junto à SEFAZ.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Salvar */}

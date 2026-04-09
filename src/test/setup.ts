@@ -6,7 +6,8 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }));
 
-// Limpar localStorage antes de cada teste
+// Antes de cada teste: limpa localStorage e define URL da API para o MSW
 beforeEach(() => {
   localStorage.clear();
+  localStorage.setItem("app:apiUrl", "http://localhost:9000");
 });
