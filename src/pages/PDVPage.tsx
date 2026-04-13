@@ -16,6 +16,8 @@ import type { ResultadoNFCe } from "@/types/pdv";
 import TEFModal from "@/components/TEFModal";
 import ModalTroco from "@/pages/ModalTroco";
 import ModalValorParcial from "@/pages/ModalValorParcial";
+import ModalPixPdv from "@/components/ModalPixPdv";
+import type { CobrancaPdv } from "@/services/api";
 
 interface Props {
   turno: TurnoCaixa;
@@ -34,6 +36,12 @@ function inferirTipoTEF(descricao: string): TipoTransacaoTEF {
   if (d.includes("voucher") || d.includes("beneficio") || d.includes("vale")) return "voucher";
   if (d.includes("parc")) return "credito_parcelado_loja";
   return "credito_vista";
+}
+
+/** Retorna true se a forma de pagamento é PIX via PSP (não TEF). */
+function ehPixPsp(descricao: string): boolean {
+  const d = descricao.toUpperCase();
+  return d.includes("PIX") && (d.includes("PSP") || d.includes("QR"));
 }
 
 /** Retorna true se a forma de pagamento e dinheiro. */
@@ -65,6 +73,11 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
   const [fpTEFAtual, setFpTEFAtual] = useState<FormaPagamento | null>(null);
   const tefPendenteFinalizar = useRef(false);
 
+  // Estado do modal PIX PSP
+  const [showPixPsp, setShowPixPsp] = useState(false);
+  const [fpPixPspAtual, setFpPixPspAtual] = useState<FormaPagamento | null>(null);
+  const [valorPixPsp, setValorPixPsp] = useState(0);
+
   const { imprimirRecibo, abrirGavetaManual, imprimindo, erroImpressora } = useImpressora(usuario);
   const tef = useTEF(usuario);
 
@@ -84,7 +97,7 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
     ).values()
   );
 
-  const modalAberto = showTEF || showTroco || showValorParcial;
+  const modalAberto = showTEF || showTroco || showValorParcial || showPixPsp;
 
   useEffect(() => {
     if (!modalAberto) buscaRef.current?.focus();
@@ -277,9 +290,28 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
       } catch {
         setShowTEF(false);
       }
+    } else if (ehPixPsp(forma.descricao)) {
+      setFpPixPspAtual(forma);
+      setValorPixPsp(valor);
+      setShowPixPsp(true);
     } else {
       adicionarPagamentoDireto(forma, valor);
     }
+  }
+
+  function handlePixPspPago(cobranca: CobrancaPdv) {
+    if (!fpPixPspAtual) return;
+    adicionarPagamentoDireto(fpPixPspAtual, cobranca.valor, {
+      nsu: cobranca.txid,
+      tipoTransacao: "PIX_PSP",
+    });
+    setShowPixPsp(false);
+    setFpPixPspAtual(null);
+  }
+
+  function handlePixPspCancelar() {
+    setShowPixPsp(false);
+    setFpPixPspAtual(null);
   }
 
   function handleConfirmarTroco(valorRecebido: number) {
@@ -669,6 +701,17 @@ export default function PDVPage({ turno, usuario, licenca, onSangria, onFechamen
           valorMaximo={restante}
           onConfirmar={handleConfirmarValorParcial}
           onCancelar={() => { setShowValorParcial(false); setFpValorParcialAtual(null); }}
+        />
+      )}
+
+      {/* Modal PIX via PSP */}
+      {showPixPsp && fpPixPspAtual && (
+        <ModalPixPdv
+          valor={valorPixPsp}
+          codigoEstabelecimento={turno.codigoEstabelecimento}
+          descricao="Pagamento PDV"
+          onPago={handlePixPspPago}
+          onCancelar={handlePixPspCancelar}
         />
       )}
     </div>

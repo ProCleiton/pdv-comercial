@@ -83,3 +83,39 @@ export const api = {
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
+
+// ── Cobrança PSP (PIX/Boleto) ────────────────────────────────────────────────
+
+export interface CobrancaPdv {
+  codigo: number;
+  tipo: "PIX" | "BOLETO";
+  provedor: string;
+  status: "PENDENTE" | "PAGO" | "CANCELADO" | "EXPIRADO";
+  valor: number;
+  txid: string;
+  qrcodeText: string | null;
+  qrcodeImageBase64: string | null;
+  linhaDigitavel: string | null;
+  barcodeUrl: string | null;
+  dtVencimento: string;
+  dtCriacao: string;
+  dtPagamento: string | null;
+}
+
+export function gerarCobrancaAvulsa(
+  valor: number,
+  codigoEstabelecimento: number,
+  descricao?: string
+): Promise<CobrancaPdv> {
+  return api.post<CobrancaPdv>("/cobrancas/avulso", {
+    tipo: "PIX",
+    valor,
+    codigoEstabelecimento,
+    descricao: descricao ?? "Pagamento PDV",
+  });
+}
+
+export function consultarStatusCobranca(id: number): Promise<CobrancaPdv> {
+  return api.get<CobrancaPdv>(`/cobrancas/${id}`);
+}
+

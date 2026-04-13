@@ -2,6 +2,15 @@
 
 > **Toda comunicação com o usuário deve ser em português (pt-BR).**
 
+## ⚠️ Leitura obrigatória — agentes e sub-agentes
+
+> **Todo agente que atuar neste projeto DEVE ler os arquivos abaixo como primeira ação, antes de implementar qualquer coisa:**
+>
+> 1. `C:\Users\Cleiton\Documents\Projetos\contexto.md`
+> 2. `C:\Users\Cleiton\Documents\Projetos\pdv\.github\copilot-instructions.md` (este arquivo)
+>
+> Esses arquivos contêm os **preceitos arquiteturais, convenções e restrições** que devem ser respeitados em toda implementação. Implementar sem ler = risco de violação de padrão.
+
 ## O que é este projeto
 
 App PDV (Ponto de Venda) autônomo do sistema **ComercialIA**. Construído com **Tauri 2 + React 19 + TypeScript**. Roda como desktop nativo no Windows, consumindo a API `ComercialIA.Server` na porta **9000**. É lançado pelo `frontend` (ERP principal) passando args na linha de comando.
@@ -33,7 +42,7 @@ npx vitest run src/pages/PDVPage.test.tsx
 > if ($proc) { Stop-Process -Id $proc.Id -Force; Start-Sleep -Seconds 2 }
 > ```
 
-**Estado atual: 76 testes, 0 falhas ✅** (7 suites: `escpos`, `tef`, `PDVPage`, `LicencaPage`, `AberturaTurnoPage`, `ModalValorParcial`, `ModalTroco`)
+**Estado atual: 106 testes, 0 falhas ✅** (7 suites: `escpos`, `tef`, `PDVPage`, `LicencaPage`, `AberturaTurnoPage`, `ModalValorParcial`, `ModalTroco`)
 
 ---
 
@@ -207,3 +216,20 @@ function renderPage() {
 - **Commits:** `feat:`, `fix:`, `refactor:`, `test:` + descrição em português
 - **Co-authored-by:** `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`
 - **Nunca `Stop-Process -Name`** — sempre `Stop-Process -Id <PID> -Force`
+
+---
+
+## Roadmap futuro do PDV
+
+### 🔴 Fase 1 — Crítico
+- **Integração tabela de preços**: ao buscar produto, verificar se cliente tem tabela de preços vinculada e aplicar preço especial
+- **Grade de produtos**: seleção de variação (cor/tamanho) no carrinho após scan de código de barras
+
+### 🟡 Fase 2 — Importante
+- **PIX via TEF**: integração com PSP para pagamento PIX no caixa (QR Code na tela)
+- **NFCe automática**: emissão de NFCe ao concluir venda (sem intervenção manual)
+- **Fila de atendimento**: modo balcão com múltiplos clientes em espera
+
+### 🔵 Fase 3 — Diferenciação
+- **Delivery integrado**: receber pedidos online diretamente no PDV
+- **Balança de check-out**: integração balança serial ao fechar carrinho

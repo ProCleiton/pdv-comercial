@@ -153,4 +153,42 @@ export const handlers = [
   http.post(`${BASE}/vendas`, () =>
     HttpResponse.json({ id: 100 }, { status: 201 })
   ),
+
+  // Cobrança PSP (avulso — PDV)
+  http.post(`${BASE}/cobrancas/avulso`, () =>
+    HttpResponse.json({
+      codigo: 501,
+      tipo: "PIX",
+      provedor: "MOCK",
+      status: "PENDENTE",
+      valor: 10.0,
+      txid: "mock-pix-pdv-aabbcc",
+      qrcodeText: "00020126580014br.gov.bcb.pix.mock.pdv",
+      qrcodeImageBase64: null,
+      linhaDigitavel: null,
+      barcodeUrl: null,
+      dtVencimento: "2026-12-31",
+      dtCriacao: new Date().toISOString(),
+      dtPagamento: null,
+    }, { status: 201 })
+  ),
+
+  http.get(`${BASE}/cobrancas/:id`, ({ params }) => {
+    const id = Number(params.id);
+    return HttpResponse.json({
+      codigo: id,
+      tipo: "PIX",
+      provedor: "MOCK",
+      status: id === 999 ? "PAGO" : "PENDENTE",
+      valor: 10.0,
+      txid: "mock-pix-pdv-aabbcc",
+      qrcodeText: "00020126580014br.gov.bcb.pix.mock.pdv",
+      qrcodeImageBase64: null,
+      linhaDigitavel: null,
+      barcodeUrl: null,
+      dtVencimento: "2026-12-31",
+      dtCriacao: new Date().toISOString(),
+      dtPagamento: id === 999 ? new Date().toISOString() : null,
+    });
+  }),
 ];
