@@ -10,6 +10,7 @@ import {
 } from "@/services/tef";
 import { MockTefProvider } from "@/services/tefMock";
 import { SiTefProvider } from "@/services/tefSitef";
+import { BackendTefProvider } from "@/services/BackendTefProvider";
 import { logInfo, logError } from "@/services/logger";
 import type { UsuarioPDV } from "@/lib/auth";
 
@@ -23,6 +24,11 @@ function criarProvider(): ITefProvider {
       codigoEstabelecimento: cfg.codigoEstabelecimentoSitef,
       codigoTerminal: cfg.codigoTerminalSitef,
       timeoutMs: cfg.timeoutSegundos * 1000,
+    });
+  }
+  if (cfg.provider === "backend") {
+    return new BackendTefProvider({
+      codigoEstabelecimento: cfg.codigoEstabelecimentoBackend,
     });
   }
   return new MockTefProvider();

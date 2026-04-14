@@ -73,7 +73,7 @@ export interface TransacaoTEF {
 
 export interface ConfigTEF {
   /** Provider selecionado */
-  provider: "mock" | "sitef";
+  provider: "mock" | "sitef" | "backend";
   /** Endpoint da bridge SiTef (ex: http://localhost:4096) */
   endpointSitef: string;
   /** Código do estabelecimento no SiTef */
@@ -82,6 +82,11 @@ export interface ConfigTEF {
   codigoTerminalSitef: string;
   /** Timeout de operação em segundos */
   timeoutSegundos: number;
+  /**
+   * Código do estabelecimento para o BackendTefProvider.
+   * Obrigatório quando provider === "backend".
+   */
+  codigoEstabelecimentoBackend: number;
   /**
    * IDs das formas de pagamento do sistema que devem acionar o fluxo TEF.
    * Ex: [2, 3] → "Cartão Débito" e "Cartão Crédito" acionam o PINPAD.
@@ -144,5 +149,6 @@ export const CONFIG_TEF_PADRAO: ConfigTEF = {
   codigoEstabelecimentoSitef: "",
   codigoTerminalSitef: "001",
   timeoutSegundos: 60,
+  codigoEstabelecimentoBackend: 0,
   codigosFormasPagamentoTEF: [],
 };

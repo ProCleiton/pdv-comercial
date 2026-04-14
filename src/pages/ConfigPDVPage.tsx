@@ -351,7 +351,7 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
           <div className="space-y-1">
             <label className="text-xs text-[var(--muted-foreground)]">Provider</label>
             <div className="flex gap-4">
-              {(["mock", "sitef"] as const).map((p) => (
+              {(["mock", "sitef", "backend"] as const).map((p) => (
                 <label key={p} className="flex items-center gap-2 text-sm text-[var(--foreground)] cursor-pointer">
                   <input
                     type="radio"
@@ -360,7 +360,7 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
                     checked={cfgTEF.provider === p}
                     onChange={() => setCfgTEF((c) => ({ ...c, provider: p }))}
                   />
-                  {p === "mock" ? "Mock (desenvolvimento)" : "SiTef (produção)"}
+                  {p === "mock" ? "Mock (desenvolvimento)" : p === "sitef" ? "SiTef (intSiTef local)" : "Backend (via servidor — recomendado)"}
                 </label>
               ))}
             </div>
@@ -404,6 +404,29 @@ export default function ConfigPDVPage({ onVoltar }: Props) {
                   onChange={(e) => setCfgTEF((c) => ({ ...c, timeoutSegundos: Number(e.target.value) }))}
                   className="w-24"
                 />
+              </div>
+            </div>
+          )}
+
+          {cfgTEF.provider === "backend" && (
+            <div className="space-y-3 pl-4 border-l-2 border-[var(--border)]">
+              <p className="text-xs text-[var(--muted-foreground)]">
+                O PDV delega todas as operações TEF ao servidor. O servidor Spring Boot audita cada
+                transação e se comunica com o PINPAD via microserviço fiscal (ACBrTEF).
+              </p>
+              <div className="space-y-1">
+                <label className="text-xs text-[var(--muted-foreground)]">Código do Estabelecimento</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={cfgTEF.codigoEstabelecimentoBackend || ""}
+                  onChange={(e) => setCfgTEF((c) => ({ ...c, codigoEstabelecimentoBackend: Number(e.target.value) }))}
+                  placeholder="1"
+                  className="w-40"
+                />
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Código do estabelecimento cadastrado no sistema (usado para auditoria das transações).
+                </p>
               </div>
             </div>
           )}

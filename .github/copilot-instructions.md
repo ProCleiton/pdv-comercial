@@ -130,6 +130,101 @@ interface ITefProvider {
 
 **Fluxo no hook `useTEF`:** lê a config, instancia o provider correto via factory interna `criarProvider()`. O provider é cacheado em `useRef` durante o ciclo de vida do componente.
 
+### Providers disponíveis
+
+| Provider | Classe | Uso |
+|----------|--------|-----|
+| `mock` | `MockTefProvider` | Desenvolvimento e testes (sem hardware) |
+| `sitef` | `SiTefProvider` | SiTef via HTTP bridge local (`intSiTef.dll` — Windows only) |
+| `backend` | `BackendTefProvider` | **Recomendado produção** — PDV → Spring Boot → fiscal (ACBrTEF) → PINPAD |
+
+### Arquitetura recomendada (provider `backend`)
+
+```
+PDV → POST /tef/iniciar (Spring :9000, timeout 90s)
+     → POST /fiscal/tef/iniciar (fiscal :9001, ACBrTEF)
+     → PINPAD → rede de captura
+     ← resposta síncrona (aprovado/recusado)
+     ← Spring salva TRANSACOES_TEF (auditoria)
+     ← PDV exibe resultado + imprime comprovante
+```
+
+---
+
+### Documentação oficial dos principais fornecedores TEF
+
+#### SiTef (Software Express / Cielo) — recomendado para F2.11
+> Padrão de mercado BR — ACBrTEF tem suporte built-in para SiTef.
+
+| Recurso | Link |
+|---------|------|
+| Portal do desenvolvedor | https://www.softwareexpress.com.br/desenvolvedores |
+| Manual de integração TEF Discado/IP | https://www.softwareexpress.com.br/sitef/manuais |
+| Documentação ACBrTEF + SiTef | https://acbr.sourceforge.io/dokuwiki/doku.php?id=acbr:acbrtef |
+| ClibSiTef (Linux `.so`) | Distribuição via contrato com Software Express/Cielo |
+| Ambiente de homologação | Solicitar em https://www.cielo.com.br/desenvolvedores/ |
+| intSiTef (Windows `.dll`) | Parte do kit SiTef — para o provider `sitef` (legado) |
+
+**Fluxo SiTef via ACBrTEF (F2.11):**
+1. Instalar `ClibSiTef.so` no container Docker do fiscal (`/usr/lib/ClibSiTef.so`)
+2. Configurar em `ACBrTEF.ini`: `[SiTef] IP=<ip_rede_captura> Porta=4096`
+3. Substituir stub em `FiscalTEF.Service.pas` por chamadas reais do ACBrTEF
+4. Solicitar à Cielo/Software Express: `CNPJ`, `código do estabelecimento`, `IP do servidor SiTef`
+
+---
+
+#### Stone / Linx Pay — alternativa moderna
+> API REST moderna, sem middleware local, boa para novos projetos.
+
+| Recurso | Link |
+|---------|------|
+| Documentação da API | https://docs.stone.com.br |
+| SDK Java (Stone) | https://github.com/stone-payments/stone-java |
+| Sandbox / simulador | https://docs.stone.com.br/docs/primeiros-passos |
+| Portal do parceiro | https://www.stone.com.br/parceiros |
+| Tipos de transação suportados | Débito, Crédito à vista, Parcelado loja/adm, PIX, Voucher |
+
+**Diferença arquitetural Stone:** ao contrário do SiTef (middleware local), a Stone usa API cloud. O fiscal chamaria `https://api.stone.com.br/terminals/{id}/payment` — sem `ClibSiTef.so` necessário. Requer terminal Stone certificado.
+
+---
+
+#### Adyen Terminal API — enterprise
+> Melhor documentação e suporte internacional. Ideal para redes com presença fora do Brasil.
+
+| Recurso | Link |
+|---------|------|
+| Terminal API docs | https://docs.adyen.com/point-of-sale/design-your-integration/terminal-api |
+| Simulador de terminal | https://docs.adyen.com/point-of-sale/testing-and-certification/test-card-numbers |
+| SDK Java | https://github.com/Adyen/adyen-java-api-library |
+| Ambiente de teste | https://ca-test.adyen.com |
+| Tipos de transação | Cartão presente, Contactless, PIX (via acquirer), QR Code |
+
+**Diferença Adyen:** comunicação via JSON/HTTPS direto ao cloud Adyen (sem servidor SiTef local). Terminal Adyen (ex: AMS1) se comunica pela rede interna com o sistema. Requer contrato Adyen + acquirer homologado (Cielo, Rede, GetNet).
+
+---
+
+#### CloudWalk / InfinityPay — cloud-native BR
+> Fintech moderna, hardware acessível, API REST bem documentada.
+
+| Recurso | Link |
+|---------|------|
+| Documentação API | https://developers.cloudwalk.io |
+| SDK / exemplos | https://github.com/cloudwalk |
+| Simulador | Disponível no portal do desenvolvedor |
+| Terminal InfinityPOS | Hardware próprio (Android) — SDK dedicado |
+
+---
+
+#### PAX Technology — para POS Android dedicado
+> Quando o hardware é terminal PAX (comum em supermercados). SDK direto no device.
+
+| Recurso | Link |
+|---------|------|
+| Portal desenvolvedor | https://developer.pax.us |
+| PAXSTORE (distribuição de apps) | https://www.paxstore.us |
+| SDK Android PAX | Disponível no portal após cadastro |
+| Simulador PAX SimuCard | Incluído no SDK |
+
 ---
 
 ## ESC/POS
