@@ -93,3 +93,34 @@ describe("LicencaPage — etapa licença (lançamento via frontend)", () => {
     await waitFor(() => expect(onErroPermanente).toHaveBeenCalled());
   });
 });
+
+describe("LicencaPage — configuração do servidor", () => {
+  it("exibe botão de engrenagem na tela de login", () => {
+    renderPage();
+    expect(screen.getByRole("button", { name: /configurações do servidor/i })).toBeInTheDocument();
+  });
+
+  it("abre painel de configuração ao clicar na engrenagem", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /configurações do servidor/i }));
+    expect(screen.getByText(/configuração do servidor/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/url do servidor/i)).toBeInTheDocument();
+  });
+
+  it("fecha painel ao salvar URL", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /configurações do servidor/i }));
+    expect(screen.getByText(/configuração do servidor/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+    expect(screen.queryByText(/configuração do servidor/i)).not.toBeInTheDocument();
+  });
+
+  it("salva a URL no localStorage ao clicar em Salvar", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /configurações do servidor/i }));
+    const input = screen.getByLabelText(/url do servidor/i);
+    fireEvent.change(input, { target: { value: "http://192.168.1.50:9000" } });
+    fireEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+    expect(localStorage.getItem("app:apiUrl")).toBe("http://192.168.1.50:9000");
+  });
+});

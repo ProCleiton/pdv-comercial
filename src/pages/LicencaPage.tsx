@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { Settings } from "lucide-react";
 import { api } from "@/services/api";
+import { getApiBaseUrl, setApiBaseUrl } from "@/services/api";
 import { logInfo, logError } from "@/services/logger";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -21,6 +23,30 @@ export default function LicencaPage({ onLicencaValida, onErroPermanente }: Props
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState("");
   const [usuarioTemp, setUsuarioTemp] = useState<UsuarioPDV | null>(null);
+
+  const [showConfig, setShowConfig] = useState(false);
+  const [urlServidor, setUrlServidor] = useState(() => getApiBaseUrl());
+  const [feedbackServidor, setFeedbackServidor] = useState("");
+  const [testandoServidor, setTestandoServidor] = useState(false);
+
+  function salvarUrlServidor() {
+    setApiBaseUrl(urlServidor);
+    setShowConfig(false);
+    setFeedbackServidor("");
+  }
+
+  async function testarConexao() {
+    setTestandoServidor(true);
+    setFeedbackServidor("");
+    try {
+      const res = await fetch(`${urlServidor.replace(/\/$/, "")}/actuator/health`);
+      setFeedbackServidor(res.ok ? "✅ Servidor acessível" : `⚠️ Servidor retornou ${res.status}`);
+    } catch {
+      setFeedbackServidor("❌ Não foi possível conectar ao servidor");
+    } finally {
+      setTestandoServidor(false);
+    }
+  }
 
   // Se já há token + chave nos args (lançado pelo frontend), pular diretamente para validação de licença
   useEffect(() => {
@@ -107,103 +133,164 @@ export default function LicencaPage({ onLicencaValida, onErroPermanente }: Props
     await validarLicencaAuto(chaveNorm, usuarioTemp);
   }
 
+  const configModal = showConfig && (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-start p-4 bg-black/40"
+      onClick={(e) => { if (e.target === e.currentTarget) setShowConfig(false); }}
+    >
+      <div className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xl p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">Configuração do Servidor</h2>
+        <div className="space-y-1">
+          <label className="text-xs text-[var(--muted-foreground)]" htmlFor="cfg-url-servidor-pdv">
+            URL do servidor backend
+          </label>
+          <Input
+            id="cfg-url-servidor-pdv"
+            type="url"
+            placeholder="http://192.168.1.10:9000"
+            value={urlServidor}
+            onChange={(e) => setUrlServidor(e.target.value)}
+          />
+          <p className="text-xs text-[var(--muted-foreground)]">Ex: http://localhost:9000</p>
+        </div>
+        {feedbackServidor && (
+          <p className="text-xs text-[var(--foreground)]">{feedbackServidor}</p>
+        )}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            disabled={testandoServidor}
+            onClick={testarConexao}
+          >
+            {testandoServidor ? "Testando…" : "Testar"}
+          </Button>
+          <Button type="button" size="sm" className="flex-1" onClick={salvarUrlServidor}>
+            Salvar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const gearButton = (
+    <button
+      type="button"
+      aria-label="Configurações do servidor"
+      onClick={() => { setShowConfig(true); setFeedbackServidor(""); }}
+      className="fixed bottom-4 left-4 p-2 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors z-40"
+    >
+      <Settings size={18} />
+    </button>
+  );
+
   if (etapa === "login") {
     return (
+      <>
+        {gearButton}
+        {configModal}
+        <div className="flex flex-col items-center justify-center h-full gap-8 p-8">
+          <div className="w-full max-w-sm">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-8 space-y-6">
+              <div className="text-center space-y-1">
+                <div className="text-4xl">🖥️</div>
+                <h1 className="text-2xl font-bold text-[var(--foreground)]">PDV ComercialIA</h1>
+                <p className="text-sm text-[var(--muted-foreground)]">Acesse com suas credenciais</p>
+              </div>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-sm text-[var(--muted-foreground)]">Usuário</label>
+                  <Input
+                    type="text"
+                    value={login}
+                    onChange={(e) => setLogin(e.target.value)}
+                    placeholder="login"
+                    autoFocus
+                    autoComplete="username"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm text-[var(--muted-foreground)]">Senha</label>
+                  <Input
+                    type="password"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                  />
+                </div>
+                {erro && (
+                  <div className="rounded-md bg-[var(--destructive)]/10 border border-[var(--destructive)]/30 p-3 text-sm text-[var(--destructive)]">
+                    {erro}
+                  </div>
+                )}
+                <Button type="submit" className="w-full" size="lg" disabled={processando}>
+                  {processando ? "Entrando…" : "Entrar"}
+                </Button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Etapa "licenca"
+  return (
+    <>
+      {gearButton}
+      {configModal}
       <div className="flex flex-col items-center justify-center h-full gap-8 p-8">
         <div className="w-full max-w-sm">
           <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-8 space-y-6">
             <div className="text-center space-y-1">
-              <div className="text-4xl">🖥️</div>
-              <h1 className="text-2xl font-bold text-[var(--foreground)]">PDV ComercialIA</h1>
-              <p className="text-sm text-[var(--muted-foreground)]">Acesse com suas credenciais</p>
+              <div className="text-4xl">🔑</div>
+              <h1 className="text-2xl font-bold text-[var(--foreground)]">Licença do Terminal</h1>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                {usuarioTemp ? `Olá, ${usuarioTemp.nome}` : ""}
+              </p>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Informe a chave de licença configurada para este terminal.
+              </p>
             </div>
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleValidarLicenca} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-sm text-[var(--muted-foreground)]">Usuário</label>
+                <label className="text-sm text-[var(--muted-foreground)]">Chave de Licença</label>
                 <Input
                   type="text"
-                  value={login}
-                  onChange={(e) => setLogin(e.target.value)}
-                  placeholder="login"
-                  autoFocus
-                  autoComplete="username"
+                  value={chave}
+                  onChange={(e) => setChave(e.target.value)}
+                  placeholder="LIC…"
+                  autoFocus={!processando}
+                  className="font-mono text-sm"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-sm text-[var(--muted-foreground)]">Senha</label>
-                <Input
-                  type="password"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
-              </div>
+              {processando && (
+                <p className="text-sm text-center text-[var(--muted-foreground)] animate-pulse">
+                  Validando licença…
+                </p>
+              )}
               {erro && (
                 <div className="rounded-md bg-[var(--destructive)]/10 border border-[var(--destructive)]/30 p-3 text-sm text-[var(--destructive)]">
                   {erro}
                 </div>
               )}
               <Button type="submit" className="w-full" size="lg" disabled={processando}>
-                {processando ? "Entrando…" : "Entrar"}
+                {processando ? "Validando…" : "Validar Licença"}
               </Button>
+              <button
+                type="button"
+                onClick={() => { setEtapa("login"); setErro(""); }}
+                className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+              >
+                ← Trocar de usuário
+              </button>
             </form>
           </div>
         </div>
       </div>
-    );
-  }
-
-  // Etapa "licenca"
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-8 p-8">
-      <div className="w-full max-w-sm">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-8 space-y-6">
-          <div className="text-center space-y-1">
-            <div className="text-4xl">🔑</div>
-            <h1 className="text-2xl font-bold text-[var(--foreground)]">Licença do Terminal</h1>
-            <p className="text-sm text-[var(--muted-foreground)]">
-              {usuarioTemp ? `Olá, ${usuarioTemp.nome}` : ""}
-            </p>
-            <p className="text-xs text-[var(--muted-foreground)]">
-              Informe a chave de licença configurada para este terminal.
-            </p>
-          </div>
-          <form onSubmit={handleValidarLicenca} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-sm text-[var(--muted-foreground)]">Chave de Licença</label>
-              <Input
-                type="text"
-                value={chave}
-                onChange={(e) => setChave(e.target.value)}
-                placeholder="LIC…"
-                autoFocus={!processando}
-                className="font-mono text-sm"
-              />
-            </div>
-            {processando && (
-              <p className="text-sm text-center text-[var(--muted-foreground)] animate-pulse">
-                Validando licença…
-              </p>
-            )}
-            {erro && (
-              <div className="rounded-md bg-[var(--destructive)]/10 border border-[var(--destructive)]/30 p-3 text-sm text-[var(--destructive)]">
-                {erro}
-              </div>
-            )}
-            <Button type="submit" className="w-full" size="lg" disabled={processando}>
-              {processando ? "Validando…" : "Validar Licença"}
-            </Button>
-            <button
-              type="button"
-              onClick={() => { setEtapa("login"); setErro(""); }}
-              className="w-full text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
-            >
-              ← Trocar de usuário
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
