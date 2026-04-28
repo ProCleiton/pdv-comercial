@@ -118,6 +118,17 @@ describe("MockTefProvider", () => {
     expect(cancelado.status).toBe("cancelado");
   });
 
+  it("estornar() retorna status estornado", async () => {
+    const tx = await mock.iniciar(5.0, "debito");
+    const estornado = await mock.estornar(tx.id);
+    expect(estornado.status).toBe("estornado");
+    expect(estornado.mensagemOperador).toBe("Transação estornada");
+  });
+
+  it("estornar() em transação inexistente lança erro", async () => {
+    await expect(mock.estornar("nao-existe")).rejects.toThrow();
+  });
+
   it("confirmar() comportamento=erro_comunicacao lança exceção", async () => {
     mock.setComportamento("erro_comunicacao");
     const tx = await mock.iniciar(2.0, "credito_vista");

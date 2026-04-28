@@ -177,6 +177,22 @@ export class MockTefProvider implements ITefProvider {
     return { ...txCancelada };
   }
 
+  async estornar(id: string): Promise<TransacaoTEF> {
+    const tx = this.transacoes.get(id);
+    if (!tx) throw new Error(`Transação ${id} não encontrada`);
+
+    await this.esperar(300);
+
+    const txEstornada: TransacaoTEF = {
+      ...tx,
+      status: "estornado",
+      mensagemOperador: "Transação estornada",
+      mensagemCliente: "Estornado",
+    };
+    this.transacoes.set(id, txEstornada);
+    return { ...txEstornada };
+  }
+
   async consultar(id: string): Promise<TransacaoTEF> {
     const tx = this.transacoes.get(id);
     if (!tx) throw new Error(`Transação ${id} não encontrada`);

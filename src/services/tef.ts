@@ -31,6 +31,7 @@ export type StatusTransacaoTEF =
   | "aprovado"
   | "recusado"
   | "cancelado"
+  | "estornado"
   | "erro";
 
 export type BandeiraTEF =
@@ -106,6 +107,11 @@ export interface ITefProvider {
   confirmar(id: string): Promise<TransacaoTEF>;
   /** Cancela/desfaz a transação (antes da confirmação). */
   cancelar(id: string): Promise<TransacaoTEF>;
+  /**
+   * Estorna a transação pós-confirmação (reversal).
+   * Requer que a transação esteja APROVADA e vinculada a uma venda.
+   */
+  estornar(id: string): Promise<TransacaoTEF>;
   /** Consulta o status atual de uma transação em andamento. */
   consultar(id: string): Promise<TransacaoTEF>;
 }

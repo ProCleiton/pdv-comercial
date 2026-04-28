@@ -46,6 +46,11 @@ export interface UseTEFResult {
   confirmar: () => Promise<TransacaoTEF>;
   /** Cancela a transação em andamento */
   cancelar: () => Promise<void>;
+  /**
+   * Estorna transação pós-confirmação (reversal).
+   * Requer idTransacao do backend — use após venda já confirmada.
+   */
+  estornar: (idTransacao: string) => Promise<TransacaoTEF>;
   /** Reseta o estado para idle (após exibir resultado ao usuário) */
   reset: () => void;
   /** Indica se o TEF está configurado (algum provider ativo) */
@@ -134,6 +139,23 @@ export function useTEF(usuario: UsuarioPDV): UseTEFResult {
     }
   }, [transacao, usuario.login]);
 
+  const estornar = useCallback(async (idTransacao: string): Promise<TransacaoTEF> => {
+    setStatus("processando");
+    try {
+      const provider = getProvider();
+      const txEstornada = await provider.estornar(idTransacao);
+      setTransacao(txEstornada);
+      setStatus("estornado");
+      await logInfo("TEF", usuario.login, "tef_estornado", `id=${idTransacao}`);
+      return txEstornada;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao estornar TEF";
+      await logError("TEF", usuario.login, "tef_erro_estornar", msg);
+      setStatus("erro");
+      throw err;
+    }
+  }, [usuario.login]);
+
   const reset = useCallback(() => {
     setTransacao(null);
     setStatus("idle");
@@ -149,6 +171,7 @@ export function useTEF(usuario: UsuarioPDV): UseTEFResult {
     iniciarPagamento,
     confirmar,
     cancelar,
+    estornar,
     reset,
     temTEF,
     ehPagamentoTEF,
@@ -166,6 +189,7 @@ export function descricaoStatusTEF(status: StatusTransacaoTEF): string {
     aprovado: "Aprovado ✓",
     recusado: "Recusado ✗",
     cancelado: "Cancelado",
+    estornado: "Estornado",
     erro: "Erro de comunicação",
   };
   return map[status] ?? status;
@@ -175,7 +199,7 @@ export function descricaoStatusTEF(status: StatusTransacaoTEF): string {
 export function corStatusTEF(status: StatusTransacaoTEF): string {
   if (status === "aprovado") return "var(--success)";
   if (status === "recusado" || status === "erro") return "var(--destructive)";
-  if (status === "cancelado") return "var(--muted-foreground)";
+  if (status === "cancelado" || status === "estornado") return "var(--muted-foreground)";
   return "var(--foreground)";
 }
 

@@ -194,6 +194,40 @@ export class SiTefProvider implements ITefProvider {
     return { ...txCancelada };
   }
 
+  /**
+   * Estorna transação pós-confirmação via SiTef.
+   *
+   * ⚠️ O fluxo de desfazimento SiTef exige integração com o intSiTef via
+   * "TransacaoDesfazimento" (código 200). Esta implementação é um skeleton —
+   * em produção requer homologação com o adquirente.
+   */
+  async estornar(id: string): Promise<TransacaoTEF> {
+    const tx = this.transacoes.get(id);
+    if (!tx) throw new Error(`Transação ${id} não encontrada`);
+
+    const resp = await this.post<SiTefResponse>("/DesfazerTransacao", {
+      IdTransacao: id,
+      Estabelecimento: this.cfg.codigoEstabelecimento,
+      Terminal: this.cfg.codigoTerminal,
+      Valor: centavosParaReais(tx.valorCentavos),
+      NSU: tx.nsu,
+      CodAutorizacao: tx.codigoAutorizacao,
+    });
+
+    if (resp.Resp !== 0) {
+      throw new Error(resp.TextoOperador ?? `Erro estorno SiTef: ${resp.Resp}`);
+    }
+
+    const txEstornada: TransacaoTEF = {
+      ...tx,
+      status: "estornado",
+      mensagemOperador: resp.TextoOperador ?? "Estornado",
+      mensagemCliente: resp.TextoPinpad ?? "Estornado",
+    };
+    this.transacoes.set(id, txEstornada);
+    return { ...txEstornada };
+  }
+
   async consultar(id: string): Promise<TransacaoTEF> {
     const tx = this.transacoes.get(id);
     if (!tx) throw new Error(`Transação ${id} não encontrada`);

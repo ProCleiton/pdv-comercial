@@ -19,6 +19,7 @@ const ICONE: Record<StatusTransacaoTEF, string> = {
   aprovado: "✅",
   recusado: "❌",
   cancelado: "🚫",
+  estornado: "↩️",
   erro: "⚠️",
 };
 
@@ -31,7 +32,7 @@ const TIPO_LABEL: Record<TipoTransacaoTEF, string> = {
   voucher: "Voucher",
 };
 
-const STATUS_TERMINAL: StatusTransacaoTEF[] = ["aprovado", "recusado", "cancelado", "erro"];
+const STATUS_TERMINAL: StatusTransacaoTEF[] = ["aprovado", "recusado", "cancelado", "estornado", "erro"];
 const STATUS_CANCELAVEL: StatusTransacaoTEF[] = ["aguardando_cartao", "aguardando_senha"];
 
 export default function TEFModal({ transacao, status, tipo, onCancelar, onFechar }: Props) {

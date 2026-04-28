@@ -95,6 +95,31 @@ describe("BackendTefProvider", () => {
     expect(url).toContain("/tef/cancelar/TEF-456");
   });
 
+  it("estornar — retorna status estornado quando backend confirma reversal", async () => {
+    mockFetch(200, {
+      idTransacao: "TEF-789",
+      status: "ESTORNADO",
+      parcelas: 1,
+      valor: 50.0,
+      tipo: "credito_vista",
+      mensagemOperador: "Estorno realizado",
+    });
+
+    const provider = makeProvider();
+    const tx = await provider.estornar("TEF-789");
+
+    expect(tx.status).toBe("estornado");
+    const [url] = (vi.mocked(fetch).mock.calls[0] as [string, ...unknown[]]);
+    expect(url).toContain("/tef/estornar/TEF-789");
+  });
+
+  it("estornar — lança erro quando backend retorna 400", async () => {
+    mockFetch(400, { message: "Transação ainda não vinculada a uma venda" });
+
+    const provider = makeProvider();
+    await expect(provider.estornar("TEF-SEM-VENDA")).rejects.toThrow("TEF backend erro");
+  });
+
   it("consultar — faz GET /tef/consultar/{id}", async () => {
     mockFetch(200, {
       idTransacao: "TEF-789",
