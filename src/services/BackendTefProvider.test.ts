@@ -49,6 +49,32 @@ describe("BackendTefProvider", () => {
     expect(tx.dadosImpressao).toHaveLength(2);
   });
 
+  it("iniciar PIX — envia tipo pix ao backend e retorna aprovado com bandeira PIX", async () => {
+    mockFetch(201, {
+      idTransacao: "TEF-PIX-001",
+      status: "APROVADO",
+      nsu: "PIX0001",
+      codigoAutorizacao: "PIXAUTH01",
+      bandeira: "PIX",
+      mensagemOperador: "PIX aprovado via PINPAD",
+      mensagemCliente: "PIX aprovado",
+      parcelas: 1,
+      valor: 80.0,
+      dadosImpressao: ["PIX APROVADO", "NSU: PIX0001"],
+    });
+
+    const provider = makeProvider();
+    const tx = await provider.iniciar(80.0, "pix");
+
+    expect(tx.id).toBe("TEF-PIX-001");
+    expect(tx.status).toBe("aprovado");
+    expect(tx.bandeira).toBe("PIX");
+
+    const [, opts] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(opts.body as string);
+    expect(body.tipo).toBe("pix");
+  });
+
   it("iniciar — lança erro quando backend retorna NOT_IMPLEMENTED (stub fiscal)", async () => {
     mockFetch(422, {
       message: "TEF recusado: TEF não configurado — aguardando integração ACBrTEF",
