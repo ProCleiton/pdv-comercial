@@ -2,7 +2,7 @@ import type { TipoTransacaoTEF } from "@/services/tef";
 
 /** Mapeia descricao da forma de pagamento para tipo TEF. */
 export function inferirTipoTEF(descricao: string): TipoTransacaoTEF {
-  const d = descricao.toLowerCase();
+  const d = descricao.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (d.includes("debit") || d.includes("debito")) return "debito";
   if (d.includes("pix")) return "pix";
   if (d.includes("voucher") || d.includes("beneficio") || d.includes("vale")) return "voucher";
