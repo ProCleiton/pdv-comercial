@@ -60,6 +60,11 @@ export class BackendTefProvider implements ITefProvider {
     return this.mapResponse(res, res.valor * 100, res.tipo, res.parcelas);
   }
 
+  async estornar(id: string): Promise<TransacaoTEF> {
+    const res = await this.post(`/tef/estornar/${encodeURIComponent(id)}`, {});
+    return this.mapResponse(res, (res.valor ?? 0) * 100, res.tipo ?? "debito", res.parcelas ?? 1);
+  }
+
   async consultar(id: string): Promise<TransacaoTEF> {
     const token = localStorage.getItem("token");
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -145,6 +150,7 @@ function mapStatus(backendStatus: string): TransacaoTEF["status"] {
     case "APROVADO":    return "aprovado";
     case "RECUSADO":    return "recusado";
     case "CANCELADO":   return "cancelado";
+    case "ESTORNADO":   return "estornado";
     case "NOT_IMPLEMENTED":
     case "PENDENTE":    return "iniciando";
     default:            return "processando";
